@@ -42,7 +42,7 @@ export default async function SkillDetailPage({
 
   return (
     <main style={{ maxWidth: 760, margin: "0 auto", padding: 24 }}>
-      <Link href="/skills">← Back</Link>
+      <Link href={`/skills/${String(skill._id)}`}>...</Link>
 
       <h1 style={{ fontSize: 28, fontWeight: 800, marginTop: 16 }}>{title}</h1>
 

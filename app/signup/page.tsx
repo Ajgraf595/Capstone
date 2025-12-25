@@ -1,99 +1,184 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
-import { headers } from "next/headers";
-import { notFound } from "next/navigation";
-import type React from "react";
 
-type SkillFromApi = {
-  _id: string;
-  name?: string;
-  title?: string; // in case your API uses title instead of name
-  description?: string;
-  type?: string;
-  createdAt?: string;
-};
+type SignupResponse =
+  | { user: { id: string; email?: string; name?: string } }
+  | { error: string };
 
-type SkillUI = {
-  id: string;
-  title: string;
-  description: string;
-  type: string;
-  createdAt?: string;
-};
+export default function SignupPage() {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-function hasSkill(x: unknown): x is { skill: SkillFromApi } {
-  if (!x || typeof x !== "object") return false;
-  return "skill" in x;
-}
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [createdUserId, setCreatedUserId] = useState<string | null>(null);
 
-async function getSkill(id: string): Promise<SkillUI | null> {
-  const h = await headers();
-  const host = h.get("host");
-  if (!host) return null;
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setCreatedUserId(null);
 
-  const protocol = process.env.NODE_ENV === "development" ? "http" : "https";
+    if (!email.trim() || !password.trim()) {
+      setError("Email and password are required.");
+      return;
+    }
 
-  const res = await fetch(`${protocol}://${host}/api/skills/${id}`, {
-    cache: "no-store",
-  });
+    setLoading(true);
+    try {
+      const res = await fetch("/api/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim() || undefined,
+          email: email.trim(),
+          password,
+        }),
+      });
 
-  if (res.status === 404) return null;
-  if (!res.ok) return null;
+      const data = (await res.json()) as SignupResponse;
 
-  const json: unknown = await res.json();
-  if (!hasSkill(json) || !json.skill) return null;
+      if (!res.ok) {
+        setError("error" in data ? data.error : "Signup failed.");
+        return;
+      }
 
-  const s = json.skill;
+      // success
+      if ("user" in data) {
+        setCreatedUserId(data.user.id);
+      } else {
+        setCreatedUserId("created");
+      }
 
-  return {
-    id: String(s._id),
-    title: String(s.name ?? s.title ?? "Untitled skill"),
-    description: String(s.description ?? ""),
-    type: String(s.type ?? ""),
-    createdAt: s.createdAt ? String(s.createdAt) : undefined,
-  };
-}
-
-export default async function SkillDetailPage({
-  params,
-}: {
-  params: { id: string };
-}) {
-  const skill = await getSkill(params.id);
-
-  if (!skill) notFound();
+      // optional: clear fields
+      // setName(""); setEmail(""); setPassword("");
+    } catch {
+      setError("Network error. Is the dev server running?");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
-    <main style={{ maxWidth: 760, margin: "0 auto", padding: 24 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-        <Link href="/skills" style={{ textDecoration: "none" }}>
-          ← Back
-        </Link>
+    <main style={{ maxWidth: 520, margin: "2rem auto", padding: "0 1.25rem" }}>
+      <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800 }}>Sign up</h1>
+      <p style={{ marginTop: 8, opacity: 0.75 }}>
+        Create an account to post and manage your skills.
+      </p>
 
-        <Link href={`/skills/${skill.id}/edit`} style={{ fontWeight: 600 }}>
-          Edit
-        </Link>
-      </div>
+      <form
+        onSubmit={onSubmit}
+        style={{
+          marginTop: 16,
+          border: "1px solid #e5e5e5",
+          borderRadius: 12,
+          padding: 16,
+          display: "grid",
+          gap: 12,
+        }}
+      >
+        <label style={{ display: "grid", gap: 6 }}>
+          <span style={{ fontSize: 14, fontWeight: 600 }}>Name (optional)</span>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Ali"
+            autoComplete="name"
+            style={{
+              padding: "10px 12px",
+              border: "1px solid #ddd",
+              borderRadius: 10,
+            }}
+          />
+        </label>
 
-      <h1 style={{ fontSize: 28, fontWeight: 800, marginTop: 16 }}>
-        {skill.title}
-      </h1>
+        <label style={{ display: "grid", gap: 6 }}>
+          <span style={{ fontSize: 14, fontWeight: 600 }}>Email</span>
+          <input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            autoComplete="email"
+            inputMode="email"
+            style={{
+              padding: "10px 12px",
+              border: "1px solid #ddd",
+              borderRadius: 10,
+            }}
+          />
+        </label>
 
-      {skill.type && (
-        <span
+        <label style={{ display: "grid", gap: 6 }}>
+          <span style={{ fontSize: 14, fontWeight: 600 }}>Password</span>
+          <input
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            type="password"
+            autoComplete="new-password"
+            style={{
+              padding: "10px 12px",
+              border: "1px solid #ddd",
+              borderRadius: 10,
+            }}
+          />
+          <span style={{ fontSize: 12, opacity: 0.7 }}>
+            Use at least 8 characters.
+          </span>
+        </label>
+
+        {error && (
+          <div
+            style={{
+              padding: 10,
+              borderRadius: 10,
+              border: "1px solid #f3c2c2",
+            }}
+          >
+            <p style={{ margin: 0 }}>{error}</p>
+          </div>
+        )}
+
+        {createdUserId && (
+          <div
+            style={{
+              padding: 10,
+              borderRadius: 10,
+              border: "1px solid #cfe9cf",
+            }}
+          >
+            <p style={{ margin: 0 }}>
+              Account created!{" "}
+              <Link href="/login" style={{ fontWeight: 700 }}>
+                Log in
+              </Link>
+            </p>
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={loading}
           style={{
-            display: "inline-block",
-            marginTop: 6,
-            fontSize: 12,
-            color: "var(--muted)" as React.CSSProperties["color"],
+            padding: "10px 12px",
+            borderRadius: 10,
+            border: "1px solid #ddd",
+            fontWeight: 700,
+            cursor: loading ? "not-allowed" : "pointer",
           }}
         >
-          {skill.type}
-        </span>
-      )}
+          {loading ? "Creating..." : "Create account"}
+        </button>
 
-      {skill.description && (
-        <p style={{ marginTop: 12, lineHeight: 1.5 }}>{skill.description}</p>
-      )}
+        <p style={{ margin: 0, fontSize: 14, opacity: 0.8 }}>
+          Already have an account?{" "}
+          <Link href="/login" style={{ fontWeight: 700 }}>
+            Log in
+          </Link>
+        </p>
+      </form>
     </main>
   );
 }

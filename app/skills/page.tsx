@@ -2,7 +2,9 @@ import Link from "next/link";
 import { headers } from "next/headers";
 
 type SkillFromApi = {
-  _id: string;
+  _id?: string;
+  id?: string;
+  name?: string;
   title?: string;
   description?: string;
   type?: "OFFER" | "REQUEST";
@@ -19,10 +21,13 @@ type SkillUI = {
 
 async function getSkills(): Promise<SkillUI[]> {
   const h = await headers();
-  const host = h.get("host"); // e.g. localhost:3000
+  const host = h.get("host");
   if (!host) return [];
 
-  const protocol = process.env.NODE_ENV === "development" ? "http" : "https";
+  const protocol =
+    process.env.NODE_ENV === "development"
+      ? "http"
+      : h.get("x-forwarded-proto") ?? "https";
 
   const res = await fetch(`${protocol}://${host}/api/skills`, {
     cache: "no-store",
@@ -30,16 +35,24 @@ async function getSkills(): Promise<SkillUI[]> {
 
   if (!res.ok) return [];
 
-  const data = (await res.json()) as { skills?: SkillFromApi[] };
-  const skills = data.skills ?? [];
+  const json = (await res.json()) as { skills?: SkillFromApi[] };
+  const skills = json.skills ?? [];
 
-  return skills.map((s) => ({
-    id: String(s._id),
-    title: String(s.title ?? "").trim(),
-    description: String(s.description ?? "").trim(),
-    type: (s.type ?? "") as SkillUI["type"],
-    createdAt: String(s.createdAt ?? ""),
-  }));
+  // Normalize once so links never become /skills/undefined
+  return skills
+    .map((s): SkillUI | null => {
+      const id = s._id ?? s.id;
+      if (!id) return null;
+
+      return {
+        id: String(id),
+        title: String(s.title ?? s.name ?? "").trim(),
+        description: String(s.description ?? "").trim(),
+        type: (s.type ?? "") as SkillUI["type"],
+        createdAt: String(s.createdAt ?? ""),
+      };
+    })
+    .filter((x): x is SkillUI => Boolean(x));
 }
 
 export default async function SkillsPage() {
